@@ -13,10 +13,11 @@ def run_openface(dataset_dir, output_dir, feature_extractor_path, timestamp):
 
 
 def _realtime_openface(dir_path, output_dir, extractor_path):
+    print("Running openface")
     process = subprocess.Popen(
-        [extractor_path, '-fdir', dir_path, '-aus', '-out_dir', output_dir],
+        [extractor_path, '-fdir', dir_path, '-aus', '-g', '-out_dir', output_dir],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
     process.communicate()
-
-    print(f"Succesfully extracted the action units into {output_dir}")
+    aggregate_au_realtime(output_dir)
+    print("Finished extraction and consolidation")

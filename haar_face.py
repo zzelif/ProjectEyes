@@ -2,45 +2,19 @@ import cv2
 import time
 import os
 
-face_detected = False
-centered_face = False
-start_time = None
-frame_count = 0
-
-#
-# Detect if face is visible
-def detect_face_haar(frame):
-    """
-    Detects a face in the given frame.
-
-    Args:
-        frame: The input video frame.
-    Returns:
-        face: Cropped face region if detected, else None.
-    """
-    classifier_path = ".venv\lib\site-packages\cv2\data\haarcascade_frontalface_default.xml"
-    face_cascade = cv2.CascadeClassifier(classifier_path)
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    orig_frame = frame.copy()
-
-    faces = face_cascade.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
-    return faces, orig_frame
 
 def is_face_centered(face, frame_width, frame_height):
     """
-    Detects a face in the given frame.
+    Checks if a face is centered in the frame.
 
     Args:
-        face: The input video frame.
-        frame_width: frame.shape[1]
-        frame_height: frame.shape[0]
+        face: Bounding box of the detected face.
+        frame_width: Width of the frame.
+        frame_height: Height of the frame.
 
     Returns:
-        face: boolean value whether face is centered or not
+        bool: True if the face is centered, False otherwise.
     """
-    global centered_face
-
     x, y, w, h = face
     center_x = frame_width // 2
     center_y = frame_height // 2
@@ -52,53 +26,74 @@ def is_face_centered(face, frame_width, frame_height):
     center_region_x2 = center_x + (w // 2) + int(tolerance * frame_width)
     center_region_y2 = center_y + (h // 2) + int(tolerance * frame_height)
 
-    # Check if the detected face lies inside the defined center region (with tolerance)
-    if x >= center_region_x1 and y >= center_region_y1 and x + w <= center_region_x2 and y + h <= center_region_y2:
+    return (
+        x >= center_region_x1
+        and y >= center_region_y1
+        and x + w <= center_region_x2
+        and y + h <= center_region_y2
+    )
+
+
+class FaceDetectionPipeline:
+    def __init__(self, classifier_path, output_dir, timer_threshold, rectangle_color, rectangle_thickness):
+        self.face_cascade = cv2.CascadeClassifier(classifier_path)
+        self.output_dir = output_dir
+        self.timer_threshold = timer_threshold
+        self.rectangle_color = rectangle_color
+        self.rectangle_thickness = rectangle_thickness
+
+        self.face_detected = False
+        self.centered_face = False
+        self.start_time = None
+        self.frame_count = 0
+
+        # Ensure the output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
+    def detect_faces(self, frame):
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        orig_frame = frame.copy()
+        faces = self.face_cascade.detectMultiScale(
+            gray_frame, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+        )
+        return faces, orig_frame
+
+    def process_frame(self, frame):
+        faces, orig_frame = self.detect_faces(frame)
+
+        self.centered_face = any(
+            is_face_centered((x, y, w, h), frame.shape[1], frame.shape[0])
+            for (x, y, w, h) in faces
+        )
+
+        if not self.face_detected and self.centered_face:
+            self.face_detected = True
+            self.start_time = time.time()
+            print(f"Face detected: {self.face_detected}, Timer started at: {self.start_time}")
+
+        if self.face_detected and ((time.time() - self.start_time) <= self.timer_threshold):
+            print("Timer condition satisfied. Drawing rectangle.")
+            for (x, y, w, h) in faces:
+                print(f"Drawing rectangle at: x={x}, y={y}, w={w}, h={h}")
+                cv2.rectangle(
+                    frame, (x, y), (x + w, y + h), self.rectangle_color, self.rectangle_thickness
+                )
+
+            # Save the original frame
+            frame_filename = os.path.join(self.output_dir, f"frame_{self.frame_count}.jpg")
+            if cv2.imwrite(frame_filename, orig_frame):
+                print(f"Frame saved successfully: {frame_filename}")
+            else:
+                print(f"Failed to save frame: {frame_filename}")
+            self.frame_count += 1
+
+        elif not self.centered_face:
+            self.face_detected = False
+            print("No detected face in the center. Resetting the timer.")
+
+        # Display the frame
+        cv2.imshow("Realtime Detection", frame)
+
         return True
 
-    return False
 
-def haar_features(frame, faces, orig_frame, out):
-    """
-    Detects a face in the given frame.
-
-    Args:
-        frame: The input video frame.
-        faces: Number of faces detected
-        orig_frame: The video frame without the rectangle
-        out: Output directory
-
-    Returns:
-
-    """
-    global face_detected
-    global start_time
-    global frame_count
-    global centered_face
-
-    for (x, y, w, h) in faces:
-        if is_face_centered((x, y, w, h), frame.shape[1], frame.shape[0]):
-            centered_face = True
-            break
-
-    if not face_detected and centered_face:
-        face_detected = True
-        start_time = time.time()
-        print(f"Face detected: {face_detected}, Timer started at: {start_time}")
-
-    if face_detected and ((time.time() - start_time) < 3):
-        print("Timer condition satisfied. Drawing rectangle.")
-        for (x, y, w, h) in faces:
-            print(f"Drawing rectangle at: x={x}, y={y}, w={w}, h={h}")
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 0), 5)
-
-        frame_filename = os.path.join(out, f'frame_{frame_count}.jpg')
-        cv2.imwrite(frame_filename, orig_frame)
-        frame_count += 1
-
-    elif not centered_face:
-        face_detected = False
-        print("No detected face in the center. Resetting the timer.")
-
-    # Display the frame
-    cv2.imshow("Realtime Detection", frame)
