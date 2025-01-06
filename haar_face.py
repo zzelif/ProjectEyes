@@ -3,6 +3,7 @@ import time
 import os
 
 face_detected = False
+centered_face = False
 start_time = None
 frame_count = 0
 
@@ -14,7 +15,6 @@ def detect_face_haar(frame):
 
     Args:
         frame: The input video frame.
-
     Returns:
         face: Cropped face region if detected, else None.
     """
@@ -39,6 +39,8 @@ def is_face_centered(face, frame_width, frame_height):
     Returns:
         face: boolean value whether face is centered or not
     """
+    global centered_face
+
     x, y, w, h = face
     center_x = frame_width // 2
     center_y = frame_height // 2
@@ -53,6 +55,7 @@ def is_face_centered(face, frame_width, frame_height):
     # Check if the detected face lies inside the defined center region (with tolerance)
     if x >= center_region_x1 and y >= center_region_y1 and x + w <= center_region_x2 and y + h <= center_region_y2:
         return True
+
     return False
 
 def haar_features(frame, faces, orig_frame, out):
@@ -71,8 +74,8 @@ def haar_features(frame, faces, orig_frame, out):
     global face_detected
     global start_time
     global frame_count
+    global centered_face
 
-    centered_face = False
     for (x, y, w, h) in faces:
         if is_face_centered((x, y, w, h), frame.shape[1], frame.shape[0]):
             centered_face = True
@@ -81,10 +84,13 @@ def haar_features(frame, faces, orig_frame, out):
     if not face_detected and centered_face:
         face_detected = True
         start_time = time.time()
+        print(f"Face detected: {face_detected}, Timer started at: {start_time}")
 
-    if face_detected and ((time.time() - start_time) <= 2):
+    if face_detected and ((time.time() - start_time) < 3):
+        print("Timer condition satisfied. Drawing rectangle.")
         for (x, y, w, h) in faces:
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            print(f"Drawing rectangle at: x={x}, y={y}, w={w}, h={h}")
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 0), 5)
 
         frame_filename = os.path.join(out, f'frame_{frame_count}.jpg')
         cv2.imwrite(frame_filename, orig_frame)
