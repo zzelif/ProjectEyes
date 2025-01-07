@@ -45,7 +45,7 @@ def plot_training(history, label, output):
     plt.plot(epochs_range, pre, label=f'{label} Training Precision')
     plt.plot(epochs_range, val_pre, label=f'{label} Validation Precision')
 
-    plt.legend(loc='upper left')
+    plt.legend(loc='lower right')
     plt.title('Training and Validation Precision')
 
     plt.tight_layout()
@@ -53,8 +53,9 @@ def plot_training(history, label, output):
     plt.close()
 
 def eval_model(model, x, y):
-    loss, accuracy, precision, recall = model.evaluate(x, y)
+    loss, accuracy, precision, recall, auc = model.evaluate(x, y)
 
     print(f"Validation Accuracy: {accuracy:.2f}")
     print(f"Validation Precision: {precision:.2f}")
     print(f"Validation Recall: {recall:.2f}")
+    print(f"Validation AUC: {auc:.2f}")

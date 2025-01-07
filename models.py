@@ -3,7 +3,7 @@ from tensorflow.keras.layers import Add, Input, Dense, Conv2D, Flatten, Concaten
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.applications import MobileNetV2
-import tensorflow as tf
+from tensorflow.keras.metrics import AUC
 
 def custom_model(input_shape_image, input_shape_au, emotion_labels):
     """
@@ -15,7 +15,7 @@ def custom_model(input_shape_image, input_shape_au, emotion_labels):
         emotion_labels: Contains the emotion labels or the classes. len will be used as the last dense layer
 
     Returns:
-        model: A custom model for performance-check.
+        model:
     """
     img_input = Input(shape=input_shape_image, name="image_input")
 
@@ -31,8 +31,10 @@ def custom_model(input_shape_image, input_shape_au, emotion_labels):
     # x = Dropout(0.5)(x)
     # x = Dense(32, activation='relu')(x)
 
+    x = Conv2D(128, (3, 3), activation='relu', padding='same', kernel_regularizer=l2(0.001))(x)
+    x = BatchNormalization()(x)
     x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
-    x = GlobalAveragePooling2D()(x)  # Replace Flatten
+    x = GlobalAveragePooling2D()(x)
     x = Dense(128, activation='relu', kernel_regularizer=l2(0.001))(x)
     x = Dropout(0.5)(x)
 
@@ -42,15 +44,15 @@ def custom_model(input_shape_image, input_shape_au, emotion_labels):
     y = Dense(32, activation='relu')(y)
 
     merged = Concatenate()([x, y])
-    merged = Dense(64, activation='relu')(merged)
+    merged = Dense(64, activation='relu', kernel_regularizer=l2(0.001))(merged)
     merged = Dropout(0.5)(merged)
     outputs = Dense(emotion_labels, activation='softmax')(merged)
 
     model = Model(inputs=[img_input, au_input], outputs=outputs)
     model.compile(
-        optimizer=Adam(learning_rate=0.0001),
+        optimizer=Adam(learning_rate=0.001),
         loss='categorical_crossentropy',
-        metrics=['accuracy', 'Precision', 'Recall']
+        metrics=['accuracy', 'Precision', 'Recall', AUC()]
     )
 
     model.summary()
@@ -65,26 +67,22 @@ def frozen_mobilenetv2_model(input_shape_image, emotion_labels):
         emotion_labels (list): Contains the emotion labels or the classes. len will be used as the last dense layer
 
     Returns:
-        model: Initially trained model after freezing some layers.
+        model: Hisotry object after training pretrained model after freezing some layers.
     """
     base_model = MobileNetV2(include_top=False, weights='imagenet', input_shape=input_shape_image)
     base_model.trainable = False
 
-    print("Base Model Layers:")
-    for i, layer in enumerate(base_model.layers):
-        print(f"Layer {i}: {layer.name}, trainable: {layer.trainable}")
-
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = BatchNormalization()(x)
-    x = Dense(128, activation='relu')(x)
+    x = Dense(128, activation='relu', kernel_regularizer=l2(0.0001))(x)
     x = Dropout(0.5)(x)
     outputs = Dense(len(emotion_labels), activation='softmax')(x)
 
     model = Model(inputs=base_model.input, outputs=outputs)
     model.compile(optimizer=Adam(learning_rate=0.001),
                   loss='categorical_crossentropy',
-                  metrics=['accuracy', 'Precision', 'Recall'])
+                  metrics=['accuracy', 'Precision', 'Recall', AUC()])
 
     # model.summary()
     return model
@@ -99,20 +97,16 @@ def finetuned_mobilenetv2_model(model, unfrozen_layers, lrn_rate):
         lrn_rate: adjust depending on the
 
     Returns:
-        model: The fine-tuned MobileNetV2 model.
+        model: Hisotry object after finetuning the model.
     """
 
     for layer in model.layers[-unfrozen_layers:]:
         layer.trainable = True
 
-    print("Base Model Layers:")
-    for i, layer in enumerate(model.layers):
-        print(f"Layer {i}: {layer.name}, trainable: {layer.trainable}")
-
     model.compile(
         optimizer=Adam(learning_rate=lrn_rate),
         loss='categorical_crossentropy',
-        metrics=['accuracy', 'Precision', 'Recall', tf.keras.metrics.AUC()]
+        metrics=['accuracy', 'Precision', 'Recall', AUC()]
     )
 
     # model.summary()
@@ -130,7 +124,7 @@ def final_cnn_model(model_1, model_2, emotion_labels):
     model.compile(
         optimizer=Adam(learning_rate=0.001),
         loss='categorical_crossentropy',
-        metrics=['accuracy', 'Precision', 'Recall', tf.keras.metrics.AUC()]
+        metrics=['accuracy', 'Precision', 'Recall', AUC()]
     )
 
     # model.summary()
