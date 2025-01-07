@@ -1,0 +1,10 @@
+Input:Dataset/Train\Angry\down_152_jpg.rf.692ded40eac8414394ed5062341bb914.jpg
+Input full path:C:\Users\danle\PycharmProjects\Emotion Model\Dataset\Train\Angry\down_152_jpg.rf.692ded40eac8414394ed5062341bb914.jpg
+Camera parameters:583.333,583.333,320,320
+Output csv:down_152_jpg.rf.692ded40eac8414394ed5062341bb914.csv
+Gaze: 0
+AUs: 1
+Landmarks 2D: 0
+Landmarks 3D: 0
+Pose: 0
+Shape parameters: 0

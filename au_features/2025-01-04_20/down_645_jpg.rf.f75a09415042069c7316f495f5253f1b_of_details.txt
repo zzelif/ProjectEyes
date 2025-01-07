@@ -1,0 +1,10 @@
+Input:Dataset/Train\Sad\down_645_jpg.rf.f75a09415042069c7316f495f5253f1b.jpg
+Input full path:C:\Users\danle\PycharmProjects\Emotion Model\Dataset\Train\Sad\down_645_jpg.rf.f75a09415042069c7316f495f5253f1b.jpg
+Camera parameters:583.333,583.333,320,320
+Output csv:down_645_jpg.rf.f75a09415042069c7316f495f5253f1b.csv
+Gaze: 0
+AUs: 1
+Landmarks 2D: 0
+Landmarks 3D: 0
+Pose: 0
+Shape parameters: 0

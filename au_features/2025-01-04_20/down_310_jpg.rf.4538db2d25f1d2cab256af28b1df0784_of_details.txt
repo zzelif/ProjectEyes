@@ -1,0 +1,10 @@
+Input:Dataset/Train\Neutral\down_310_jpg.rf.4538db2d25f1d2cab256af28b1df0784.jpg
+Input full path:C:\Users\danle\PycharmProjects\Emotion Model\Dataset\Train\Neutral\down_310_jpg.rf.4538db2d25f1d2cab256af28b1df0784.jpg
+Camera parameters:583.333,583.333,320,320
+Output csv:down_310_jpg.rf.4538db2d25f1d2cab256af28b1df0784.csv
+Gaze: 0
+AUs: 1
+Landmarks 2D: 0
+Landmarks 3D: 0
+Pose: 0
+Shape parameters: 0

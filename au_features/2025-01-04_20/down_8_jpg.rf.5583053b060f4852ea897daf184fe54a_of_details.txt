@@ -1,0 +1,10 @@
+Input:Dataset/Train\Happy\down_8_jpg.rf.5583053b060f4852ea897daf184fe54a.jpg
+Input full path:C:\Users\danle\PycharmProjects\Emotion Model\Dataset\Train\Happy\down_8_jpg.rf.5583053b060f4852ea897daf184fe54a.jpg
+Camera parameters:583.333,583.333,320,320
+Output csv:down_8_jpg.rf.5583053b060f4852ea897daf184fe54a.csv
+Gaze: 0
+AUs: 1
+Landmarks 2D: 0
+Landmarks 3D: 0
+Pose: 0
+Shape parameters: 0

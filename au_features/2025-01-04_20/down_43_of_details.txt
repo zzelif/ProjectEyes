@@ -1,0 +1,11 @@
+Input:C:\Users\danle\PycharmProjects\Emotion Model\Dataset\Train\Happy\down_43.png
+Input full path:C:\Users\danle\PycharmProjects\Emotion Model\Dataset\Train\Happy\down_43.png
+Camera parameters:273.438,273.438,150,150
+Output image:down_43.jpg
+Output csv:down_43.csv
+Gaze: 1
+AUs: 1
+Landmarks 2D: 1
+Landmarks 3D: 1
+Pose: 1
+Shape parameters: 1

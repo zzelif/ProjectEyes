@@ -1,0 +1,10 @@
+Input:Dataset/Test/Angry\down_368_jpg.rf.816dc9d0093a6787480cce0f3e7f4e72.jpg
+Input full path:C:\Users\danle\PycharmProjects\Emotion Model\Dataset\Test\Angry\down_368_jpg.rf.816dc9d0093a6787480cce0f3e7f4e72.jpg
+Camera parameters:583.333,583.333,320,320
+Output csv:down_368_jpg.rf.816dc9d0093a6787480cce0f3e7f4e72.csv
+Gaze: 0
+AUs: 1
+Landmarks 2D: 0
+Landmarks 3D: 0
+Pose: 0
+Shape parameters: 0

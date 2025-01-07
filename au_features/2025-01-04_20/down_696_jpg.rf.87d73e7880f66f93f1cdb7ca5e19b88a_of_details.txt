@@ -1,0 +1,10 @@
+Input:Dataset/Train\Surprised\down_696_jpg.rf.87d73e7880f66f93f1cdb7ca5e19b88a.jpg
+Input full path:C:\Users\danle\PycharmProjects\Emotion Model\Dataset\Train\Surprised\down_696_jpg.rf.87d73e7880f66f93f1cdb7ca5e19b88a.jpg
+Camera parameters:583.333,583.333,320,320
+Output csv:down_696_jpg.rf.87d73e7880f66f93f1cdb7ca5e19b88a.csv
+Gaze: 0
+AUs: 1
+Landmarks 2D: 0
+Landmarks 3D: 0
+Pose: 0
+Shape parameters: 0
