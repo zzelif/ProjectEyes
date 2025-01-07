@@ -74,18 +74,12 @@ class FaceDetectionPipeline:
         if self.face_detected and ((time.time() - self.start_time) <= self.timer_threshold):
             print("Timer condition satisfied. Drawing rectangle.")
             for (x, y, w, h) in faces:
-                print(f"Drawing rectangle at: x={x}, y={y}, w={w}, h={h}")
                 cv2.rectangle(
                     frame, (x, y), (x + w, y + h), self.rectangle_color, self.rectangle_thickness
                 )
 
-            # Save the original frame
-            frame_filename = os.path.join(self.output_dir, f"frame_{self.frame_count}.jpg")
-            if cv2.imwrite(frame_filename, orig_frame):
-                print(f"Frame saved successfully: {frame_filename}")
-            else:
-                print(f"Failed to save frame: {frame_filename}")
-            self.frame_count += 1
+            # Remove cv2.imwrite and instead push `orig_frame` directly to processed_queue
+            return orig_frame
 
         elif not self.centered_face:
             self.face_detected = False

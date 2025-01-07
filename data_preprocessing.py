@@ -1,11 +1,14 @@
 import os
+import math
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from imblearn.over_sampling import SMOTE
 from keras.src.utils import to_categorical
+from sklearn.utils import compute_class_weight
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.utils import Sequence
 
 #
 # Process and augments the data from the dirs using ImageDataGenerator
@@ -22,6 +25,16 @@ def process_dataset(train_data_dir, test_data_dir, img_size, batch_size):
 
     test_datagen = ImageDataGenerator(
         rescale=1.0 / 255
+    )
+
+    augmentor = ImageDataGenerator(
+        rotation_range=60,
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        fill_mode='nearest'
     )
 
     train_gen = train_datagen.flow_from_directory(
@@ -47,7 +60,7 @@ def process_dataset(train_data_dir, test_data_dir, img_size, batch_size):
         class_mode='categorical',
     )
 
-    return train_gen, val_gen, test_gen
+    return train_gen, val_gen, test_gen, augmentor
 
 #
 #
@@ -89,32 +102,106 @@ def align_data(image_dir, au_csv, img_size):
             if file.endswith(('.png', '.jpg', '.jpeg')):
                 image_id = os.path.splitext(file)[0]
 
-                if image_id in au_features.index:
-                    img_path = os.path.join(root, file)
-                    img = tf.keras.utils.load_img(img_path, target_size=img_size)
-                    img_array = tf.keras.utils.img_to_array(img) / 255.0
+                if image_id not in au_features.index:
+                    continue
 
-                    au = au_features.loc[image_id].values
-                    image_data.append(img_array)
-                    au_data.append(au)
-                    labels.append(emotion)
+                img_path = os.path.join(root, file)
+                img = tf.keras.utils.load_img(img_path, target_size=img_size)
+                img_array = tf.keras.utils.img_to_array(img) / 255.0
 
-    image_data = np.asarray(image_data)
-    au_data = np.array(au_data)
+                au = au_features.loc[image_id].values
+                image_data.append(img_array)
+                au_data.append(au)
+                labels.append(emotion)
+
+    image_data = np.asarray(image_data, dtype='float32')
+    au_data = np.array(au_data, dtype='float32')
     labels = np.asarray(labels)
+
     label_map = {label: idx for idx, label in enumerate(sorted(set(labels)))}
-    encoded_labels = np.array([label_map[label] for label in labels])
-    encoded_labels = to_categorical(encoded_labels)
+    encoded_labels = to_categorical([label_map[label] for label in labels])
 
     x_train_img, x_val_img, x_train_au, x_val_au, y_train, y_val = train_test_split(
         image_data, au_data, encoded_labels, test_size=0.2, random_state=42
     )
 
-    x_train_img = x_train_img.astype('float32')
-    x_train_au = x_train_au.astype('float32')
-    y_train = y_train.astype('float32')
-    x_val_img = x_val_img.astype('float32')
-    x_val_au = x_val_au.astype('float32')
-    y_val = y_val.astype('float32')
+    class_weights = compute_class_weight(
+        'balanced', classes=np.unique(y_train.argmax(axis=1)), y=y_train.argmax(axis=1)
+    )
 
-    return x_train_img, x_val_img, x_train_au, x_val_au, y_train, y_val, label_map, au_data
+    class_weights = dict(enumerate(class_weights))
+
+    return label_map, au_data, image_data
+
+
+def align_data_au(image_dir, au_csv, img_size):
+    au_features = pd.read_csv(au_csv)
+    au_features.set_index('image_id', inplace=True)
+
+    image_data, au_data, labels = [], [], []
+    emotion = os.path.basename(image_dir)
+
+    for file in os.listdir(image_dir):
+        if file.endswith(('.png', '.jpg', '.jpeg')):
+            image_id = os.path.splitext(file)[0]
+
+            if image_id not in au_features.index:
+                continue
+
+            img_path = os.path.join(image_dir, file)
+            img = tf.keras.utils.load_img(img_path, target_size=img_size)
+            img_array = tf.keras.utils.img_to_array(img) / 255.0
+
+            au = au_features.loc[image_id].values
+            image_data.append(img_array)
+            au_data.append(au)
+            labels.append(emotion)
+
+    image_data = np.asarray(image_data, dtype='float32')
+    au_data = np.array(au_data, dtype='float32')
+    labels = np.asarray(labels)
+
+    label_map = {label: idx for idx, label in enumerate(sorted(set(labels)))}
+    # encoded_labels = to_categorical([label_map[label] for label in labels])
+
+    return au_data, image_data
+
+
+class AugmentWithAU(Sequence):
+    """
+    Combines ImageDataGenerator with AU feature alignment.
+
+    Args:
+        images (numpy array): Array of images.
+        au_features (numpy array): Array of AU features.
+        labels (numpy array): Array of labels.
+        batch_size (int): Batch size for training.
+        augmentor (ImageDataGenerator): Augmentation instance.
+    """
+    def __init__(self, images, au_features, labels, batch_size, augmentor):
+        self.images = images
+        self.au_features = au_features
+        self.labels = labels
+        self.batch_size = batch_size
+        self.augmentor = augmentor
+        self.steps = math.ceil(len(images) / batch_size)  # Total steps per epoch
+
+    def __len__(self):
+        return self.steps  # Number of batches per epoch
+
+    def __getitem__(self, idx):
+        # Calculate the start and end indices for this batch
+        start = idx * self.batch_size
+        end = min((idx + 1) * self.batch_size, len(self.images))  # Avoid going out of bounds
+
+        # Extract the batch of images, AUs, and labels
+        img_batch = self.images[start:end]
+        label_batch = self.labels[start:end]
+        au_batch = self.au_features[start:end]
+
+        # Apply augmentation to the image batch
+        augmented_images = next(self.augmentor.flow(
+            img_batch, label_batch, batch_size=len(img_batch), shuffle=False
+        ))
+
+        return [augmented_images, au_batch], label_batch
