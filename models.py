@@ -4,6 +4,21 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.metrics import AUC
+import tensorflow.keras.backend as K
+
+
+def focal_loss(gamma=2., alpha=0.25):
+    def focal_loss_fixed(y_true, y_pred):
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+        y_true = K.cast(y_true, dtype='float32')
+
+        cross_entropy = -y_true * K.log(y_pred)
+        weight = alpha * y_true * K.pow(1 - y_pred, gamma)
+        loss = weight * cross_entropy
+        return K.sum(loss, axis=1)
+
+    return focal_loss_fixed
 
 def custom_model(input_shape_image, input_shape_au, emotion_labels):
     """
@@ -39,12 +54,13 @@ def custom_model(input_shape_image, input_shape_au, emotion_labels):
     x = Dropout(0.5)(x)
 
     au_input = Input(shape=input_shape_au, name="au_input")
-    y = Dense(64, activation='relu', kernel_regularizer=l2(0.001))(au_input)
+    y = Dense(64, activation='relu', kernel_regularizer=l2(0.005))(au_input)
     y = BatchNormalization()(y)
     y = Dense(32, activation='relu')(y)
+    y = Dropout(0.5)(y)
 
     merged = Concatenate()([x, y])
-    merged = Dense(64, activation='relu', kernel_regularizer=l2(0.001))(merged)
+    merged = Dense(64, activation='relu', kernel_regularizer=l2(0.005))(merged)
     merged = Dropout(0.5)(merged)
     outputs = Dense(emotion_labels, activation='softmax')(merged)
 
@@ -63,7 +79,7 @@ def frozen_mobilenetv2_model(input_shape_image, emotion_labels):
     Freezing the first layers of the mobilenetv2 for initial training on dataset.
 
     Args:
-        input_shape_image: Input shape of (228, 228, 3).
+        input_shape_image: Input shape of (224, 224, 3).
         emotion_labels (list): Contains the emotion labels or the classes. len will be used as the last dense layer
 
     Returns:
@@ -75,13 +91,15 @@ def frozen_mobilenetv2_model(input_shape_image, emotion_labels):
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = BatchNormalization()(x)
-    x = Dense(128, activation='relu', kernel_regularizer=l2(0.0001))(x)
+    x = Dense(128, activation='relu', kernel_regularizer=l2(0.005))(x)
+    x = Dropout(0.5)(x)
+    x = Dense(256, activation='relu', kernel_regularizer=l2(0.005))(x)
     x = Dropout(0.5)(x)
     outputs = Dense(len(emotion_labels), activation='softmax')(x)
 
     model = Model(inputs=base_model.input, outputs=outputs)
-    model.compile(optimizer=Adam(learning_rate=0.001),
-                  loss='categorical_crossentropy',
+    model.compile(optimizer=Adam(learning_rate=0.0001),
+                  loss=focal_loss(gamma=2., alpha=0.25),
                   metrics=['accuracy', 'Precision', 'Recall', AUC()])
 
     # model.summary()
@@ -99,13 +117,16 @@ def finetuned_mobilenetv2_model(model, unfrozen_layers, lrn_rate):
     Returns:
         model: Hisotry object after finetuning the model.
     """
+    # Freeze all layers first
+    for layer in model.layers:
+        layer.trainable = False
 
     for layer in model.layers[-unfrozen_layers:]:
         layer.trainable = True
 
     model.compile(
         optimizer=Adam(learning_rate=lrn_rate),
-        loss='categorical_crossentropy',
+        loss=focal_loss(gamma=2., alpha=0.25),
         metrics=['accuracy', 'Precision', 'Recall', AUC()]
     )
 

@@ -1,9 +1,7 @@
 import matplotlib.pyplot as plt
-# import numpy as np
-# import seaborn as sns
-# import os
-# import cv2
-# from sklearn.metrics import confusion_matrix
+import numpy as np
+import seaborn as sns
+from sklearn.metrics import confusion_matrix
 
 def plot_training(history, label, output):
     plt.figure(figsize=(16, 8))
@@ -50,6 +48,24 @@ def plot_training(history, label, output):
 
     plt.tight_layout()
     plt.savefig(output)
+    plt.close()
+
+def plot_matrix(model, x, y, emotion_labels, out):
+    y_pred = model.predict(x)
+
+    y_pred_labels = np.argmax(y_pred, axis=1)
+
+    y_test_labels = np.argmax(y, axis=1)
+
+    cm = confusion_matrix(y_test_labels, y_pred_labels)
+
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=emotion_labels, yticklabels=emotion_labels)
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.title('Confusion Matrix')
+    plt.tight_layout()
+    plt.savefig(out)
     plt.close()
 
 def eval_model(model, x, y):

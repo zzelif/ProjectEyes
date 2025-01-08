@@ -15,16 +15,32 @@ from tensorflow.keras.utils import Sequence
 def process_dataset(train_data_dir, test_data_dir, img_size, batch_size):
     train_datagen = ImageDataGenerator(
         rescale=1.0 / 255,
-        rotation_range=60,
-        shear_range=0.2,
-        zoom_range=0.2,
+        rotation_range=90,
+        shear_range=0.45,
+        zoom_range=0.45,
         horizontal_flip=True,
+        width_shift_range=0.3,
+        height_shift_range=0.3,
+        brightness_range=[0.4, 1.2],
         fill_mode='nearest',
         validation_split=0.2
     )
 
+    # frozen_datagen = ImageDataGenerator(
+    #     rescale=1.0 / 255,
+    #     rotation_range=20,
+    #     shear_range=0.1,
+    #     zoom_range=0.1,
+    #     width_shift_range=0.05,
+    #     height_shift_range=0.05,
+    #     horizontal_flip=True,
+    #     fill_mode='nearest',
+    #     validation_split=0.2
+    # )
+
     test_datagen = ImageDataGenerator(
-        rescale=1.0 / 255
+        rescale=1.0 / 255,
+        validation_split=0.2
     )
 
     augmentor = ImageDataGenerator(
@@ -45,22 +61,15 @@ def process_dataset(train_data_dir, test_data_dir, img_size, batch_size):
         subset='training'
     )
 
-    val_gen = train_datagen.flow_from_directory(
+    fine_gen = test_datagen.flow_from_directory(
         train_data_dir,
         target_size=img_size,
         batch_size=batch_size,
         class_mode='categorical',
-        subset='validation'
+        subset='validation',
     )
 
-    test_gen = test_datagen.flow_from_directory(
-        test_data_dir,
-        target_size=img_size,
-        batch_size=batch_size,
-        class_mode='categorical',
-    )
-
-    return train_gen, val_gen, test_gen, augmentor
+    return train_gen, augmentor, fine_gen
 
 #
 #
@@ -84,11 +93,59 @@ def balance_dataset(train_gen, emotion_labels, img_size, batch_size):
     x_resampled = x_resampled.reshape((-1, img_size[0], img_size[1], 3))
     y_resampled = tf.keras.utils.to_categorical(y_resampled, num_classes=len(emotion_labels))
 
-    return x_resampled, y_resampled
+    # Calculate class weights
+    class_weights = compute_class_weight(
+        class_weight='balanced',
+        classes=np.unique(labels),
+        y=labels
+    )
+    class_weights = dict(enumerate(class_weights))
+
+    return x_resampled, y_resampled, class_weights
 
 #
 #
-def align_data(image_dir, au_csv, img_size):
+def align_data(image_dir, img_size):
+    image_data, labels = [], []
+    for root, _, files in os.walk(image_dir):
+        if root == image_dir:
+            continue
+        emotion = os.path.basename(root)
+
+        for file in files:
+            if file.endswith(('.png', '.jpg', '.jpeg')):
+                img_path = os.path.join(root, file)
+                img = tf.keras.utils.load_img(img_path, target_size=img_size)
+                img_array = tf.keras.utils.img_to_array(img) / 255.0
+
+                image_data.append(img_array)
+                labels.append(emotion)
+
+    image_data = np.asarray(image_data, dtype='float32')
+    labels = np.asarray(labels)
+
+    label_map = {label: idx for idx, label in enumerate(sorted(set(labels)))}
+    encoded_labels = np.array([label_map[label] for label in labels])  # Use integers, not one-hot encoded
+
+    # Convert to categorical for training purposes
+    one_hot_encoded_labels = to_categorical(encoded_labels)
+
+    x_train_img, x_val_img, y_train, y_val = train_test_split(
+        image_data, one_hot_encoded_labels, test_size=0.15, random_state=42, shuffle=False
+    )
+
+    # Compute class weights
+    class_weights = compute_class_weight(
+        class_weight='balanced',
+        classes=np.unique(encoded_labels),
+        y=encoded_labels  # Use original integer-encoded labels
+    )
+    class_weights = dict(enumerate(class_weights))
+
+    return x_train_img, x_val_img, y_train, y_val, label_map, image_data, class_weights
+
+
+def align_data_au(image_dir, au_csv, img_size):
     au_features = pd.read_csv(au_csv)
     au_features.set_index('image_id', inplace=True)
 
@@ -122,7 +179,7 @@ def align_data(image_dir, au_csv, img_size):
     encoded_labels = to_categorical([label_map[label] for label in labels])
 
     x_train_img, x_val_img, x_train_au, x_val_au, y_train, y_val = train_test_split(
-        image_data, au_data, encoded_labels, test_size=0.2, random_state=42
+        image_data, au_data, encoded_labels, test_size=0.15, random_state=42
     )
 
     class_weights = compute_class_weight(
@@ -131,40 +188,7 @@ def align_data(image_dir, au_csv, img_size):
 
     class_weights = dict(enumerate(class_weights))
 
-    return label_map, au_data, image_data
-
-
-def align_data_au(image_dir, au_csv, img_size):
-    au_features = pd.read_csv(au_csv)
-    au_features.set_index('image_id', inplace=True)
-
-    image_data, au_data, labels = [], [], []
-    emotion = os.path.basename(image_dir)
-
-    for file in os.listdir(image_dir):
-        if file.endswith(('.png', '.jpg', '.jpeg')):
-            image_id = os.path.splitext(file)[0]
-
-            if image_id not in au_features.index:
-                continue
-
-            img_path = os.path.join(image_dir, file)
-            img = tf.keras.utils.load_img(img_path, target_size=img_size)
-            img_array = tf.keras.utils.img_to_array(img) / 255.0
-
-            au = au_features.loc[image_id].values
-            image_data.append(img_array)
-            au_data.append(au)
-            labels.append(emotion)
-
-    image_data = np.asarray(image_data, dtype='float32')
-    au_data = np.array(au_data, dtype='float32')
-    labels = np.asarray(labels)
-
-    label_map = {label: idx for idx, label in enumerate(sorted(set(labels)))}
-    # encoded_labels = to_categorical([label_map[label] for label in labels])
-
-    return au_data, image_data
+    return x_train_img, x_val_img, x_train_au, x_val_au, y_train, y_val, label_map, au_data, image_data, class_weights
 
 
 class AugmentWithAU(Sequence):
@@ -201,7 +225,7 @@ class AugmentWithAU(Sequence):
 
         # Apply augmentation to the image batch
         augmented_images = next(self.augmentor.flow(
-            img_batch, label_batch, batch_size=len(img_batch), shuffle=False
+            img_batch, None, batch_size=len(img_batch), shuffle=False
         ))
 
         return [augmented_images, au_batch], label_batch
